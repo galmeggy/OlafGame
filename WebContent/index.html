@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Kwangho's Game</title>
+<style>
+body{
+	margin: 0;
+}
+canvas{
+	background-color: #AAEEFF;
+}
+</style>
+</head>
+
+<body>
+<canvas id="canvas" width="800px" height="500px">
+</canvas>
+<script type="text/javascript">
+	var canvas;
+	var ctx;
+	var canvasBuffer; //끊김을 줄이기 위한 2단 버퍼
+	var bufferCtx;
+	
+	var olaf; //올라프
+	var sx, sy, sw = 40, sh = 55;
+	var angle = 1;
+	var background; //배경
+	
+	var enemy = new Array();
+	var enemyColor = "white";
+	var ellapse = 10;
+	
+	var speed=16; //타이머 스피드
+	var loopInstance; //타이머 인스턴스
+	
+	var STATE_START = false; //게임 시작 상태
+	var STATE_GAMEOVER = false; //게임 오버 상태
+	
+	var keyPressed = []; //키 상태
+	
+	//스코어를 위한 시간 변수
+	var oldTime;
+	var startTime;
+	var totalTime;
+	
+	window.addEventListener("load", init, false); //load시  init동작
+	//키보드입력
+	window.addEventListener("keydown", getKeyDown, false);
+	window.addEventListener("keyup", getKeyUp, false);
+	
+	//keyCode로 어떤 키를 눌렀는지 확인
+	function getKeyDown(event){
+		keyPressed[event.keyCode] = true;
+	}
+	function getKeyUp(event){
+		keyPressed[event.keyCode] = false;
+	}
+	//이미지 세팅
+	function setImage(){
+		olaf1 = new Image();
+		olaf2 = new Image();
+		olaf1.src = "img/Olaf1.png";
+		olaf2.src = "img/Olaf2.png";
+		background = new Image();
+		background.src = "img/frozenworld.jpg";
+	}
+	//text 출력
+	function drawText(ctx, text, x, y, font, color, align, base){
+		if(font != undefined) ctx.font = font;
+		if(color != undefined) ctx.fillStyle = color;
+		if(align != undefined) ctx.textAlign = align;
+		if(base != undefined) ctx.textBaseline = base;
+		ctx.fillText(text, x, y);
+	}
+	//현재 시간 가져오기
+	function getTime(){
+		var date = new Date();
+		var time = date.getTime();
+		delete date;
+		return time;
+	}
+	
+	function init(){
+		canvas = document.getElementById("canvas");
+		if(canvas == null || canvas.getContext == null)	return;
+		ctx = canvas.getContext("2d");
+		
+		canvasBuffer = document.createElement("canvas");
+		canvasBuffer.width = canvas.width;
+		canvasBuffer.height = canvas.height;
+		bufferCtx = canvasBuffer.getContext("2d");
+		
+		startMessage(); //초기 화면
+		
+		setImage(); //이미지 설정
+		
+		loopInstance = setInterval(update, speed); //반복시 update함수
+	}
+	
+	function update(){
+		if((keyPressed[13] == true) && !STATE_START){ //enter입력 & 게임 미실행
+			startGame();
+		}
+		if(keyPressed[38]){
+			sy -= 3;
+		}
+		if(keyPressed[40]){
+			sy += 3;
+		}
+		if(keyPressed[37]){
+			sx -= 3;
+			angle = 1;
+		}
+		if(keyPressed[39]){
+			sx += 3;
+			angle = 2;
+		}
+		if(keyPressed[32] == true){ //스페이스
+			document.location.reload();
+			startGame();
+		}
+		moveEnemy(ellapse);
+		drawAll(); // 직접 그리는 함수
+	}
+	
+	function drawAll(){
+		if(!STATE_START){
+			return;
+		}
+		else if(STATE_GAMEOVER){
+			stopGame();
+			drawText(ctx, "Game Over", canvas.width/2, canvas.height/2-60, "bold 30px arial", "#ffffff", "center", "top");
+			drawText(ctx, "다시시작 하려면 스페이스바", canvas.width/2, canvas.height/2-20, "bold 20px arial", "#ffffff", "center", "top");
+		}
+		else{
+			drawBg(); //배경출력
+			drawOlaf(); //올라프출력
+			ctx.drawImage(canvasBuffer, 0, 0); //버퍼의 올라프와 배경 출력
+			
+			drawEnemy(); //장애물 출력
+			
+			totalTime = (getTime() - startTime);
+			drawText(ctx, "score: "+totalTime, canvas.width-10, 10, "20px arial", "yellow", "right", "top");
+		}
+	}
+	
+	function drawOlaf(){
+		//올라프 그릴 때 제한
+		if(sx > canvas.width-40/2) sx=canvas.width-40/2;
+		if(sx < 40/2) sx=40/2;
+		if(sy > canvas.height-55/2) sy=canvas.height-55/2;
+		if(sy <55/2) sy=55/2;
+		if(angle==1){
+			bufferCtx.drawImage(olaf1, sx-sw/2, sy-sh/2);
+		}
+		else{
+			bufferCtx.drawImage(olaf2, sx-sw/2, sy-sh/2);
+		}
+	}
+	function drawBg(){
+		bufferCtx.drawImage(background, 0, 0);
+	}
+	
+	function startGame(){
+		STATE_START = true;
+		
+		//초기 위치
+		sx = canvas.width/2;
+		sy = canvas.height/2;
+		sw = 40;
+		sh = 55;
+		
+		createEnemy();
+		
+		startTime = getTime();
+	}
+
+	function stopGame(){
+		STATE_START = false;
+	}
+	
+	function createEnemy(){
+		enemy.length = 0;
+		for(var i=0; i<60; i++){
+			enemy.push({
+				x:Math.random()*canvas.width,
+				y:(i<60/2 ? 20 : canvas.height-20), //초기값은 안 부딪히게 양 끝에서 생성
+				vx:Math.random()*200-100,
+				vy:Math.random()*200-100
+			});
+		}
+	}
+	
+	function moveEnemy(ellapse){
+		for(var i=0; i<60; i++){
+			var mx = enemy[i].vx*ellapse/1000;
+			var my = enemy[i].vy*ellapse/1000;
+			enemy[i].x += mx;
+			enemy[i].y += my;
+			//화면 끝에서 반대편으로 돌아감
+			if(enemy[i].x > canvas.width) enemy[i].x=0;
+			if(enemy[i].x < 0) enemy[i].x=canvas.width;
+			if(enemy[i].y > canvas.height) enemy[i].y=0;
+			if(enemy[i].y < 0) enemy[i].y=canvas.height;
+			
+			crashEnemy(i); //충돌 enemy 인덱스
+		}
+	}
+	
+	function drawEnemy(){
+		for(var i=0; i<60; i++){
+			ctx.beginPath();
+			ctx.arc(enemy[i].x, enemy[i].y, 5, 0, 2*Math.PI);
+			ctx.fillStyle = enemyColor;
+			ctx.closePath();
+			ctx.fill();
+		}
+	}
+	
+	function crashEnemy(index){
+		var mx = enemy[index].x;
+		var my = enemy[index].y;
+		if(mx > sx-sw/2 && mx < sx+sw/2 && my > sy-sh/2 && my < sy+sh/2){
+			STATE_GAMEOVER = true;
+		}
+	}
+	
+	
+	function startMessage(){
+		drawText(ctx, "Enter to Start", canvas.width/2, canvas.height/2-60, "bold 30px arial", "#004488", "center", "top");
+		drawText(ctx, "방향키로 조작하세요", canvas.width/2, canvas.height/2-20, "bold 20px arial", "#4488AA", "center", "top");
+		drawText(ctx, "제작: 명광호", canvas.width/2, canvas.height-60, "bold 20px arial", "#4488AA", "center", "top");
+	}
+</script>
+</body>
+</html>
